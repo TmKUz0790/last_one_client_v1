@@ -1,0 +1,256 @@
+
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+
+    <!-- Custom CSS -->
+    <link
+      rel="stylesheet"
+      href="{% static 'css/style.css' %}"
+    />
+
+    <title>Client Progress Details</title>
+  </head>
+  <body>
+    <!-- Particles Container -->
+    <div id="particles-js"></div>
+    <section class="container main_content">
+      <h1>Progress for Job: {{ job.title }}</h1>
+
+  <div class="overall-progress-container">
+    <h3 class="text-center mb-4">Overall Progress</h3>
+    <div id="overallProgressChart"></div>
+</div>
+
+        <div class="container">
+          <div class="row">
+            
+              <div id="chartsContainer" class="container"></div>
+            
+          </div>
+          
+        </div>
+
+
+     
+    </section>
+
+    <!-- Bootstrap JS Bundle -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"
+    ></script>
+
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Load Static URL for particles.json -->
+    <script>
+
+      const particlesConfigUrl = "{% static 'assets/particles.json' %}";
+    </script>
+
+    <!-- Particles.js Library -->
+    <script src="{% static 'js/particles.min.js' %}"></script>
+
+    <!-- Initialize Particles.js -->
+    <script>
+      particlesJS.load('particles-js', particlesConfigUrl, function () {
+        console.log('callback - particles.js config loaded');
+      });
+    </script>
+
+    <!-- Custom JS Files -->
+     <script src="https://cdn.amcharts.com/lib/5/index.js"></script>
+    <script src="https://cdn.amcharts.com/lib/5/percent.js"></script>
+    <script src="https://cdn.amcharts.com/lib/5/themes/Animated.js"></script>
+    <script src="{% static 'js/chart.js' %}"></script>
+    <script src="{% static 'js/app.js' %}"></script>
+    <script src="{% static 'js/script.js' %}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        am5.ready(function() {
+            // Получаем данные задач из Django и проверяем в консоли
+            var tasks = JSON.parse('{{ tasks|escapejs }}');
+            console.log(tasks); // Проверьте данные задач
+
+            // Определяем общий прогресс всех задач
+            var overallProgress = 0;
+            if (tasks.length > 0) {
+                var totalPercentage = 0;
+
+                tasks.forEach(function(task) {
+                    totalPercentage += task.progress;
+                });
+
+                overallProgress = totalPercentage / tasks.length;
+            }
+
+            // Создаем корень для диаграммы общего прогресса
+            var root = am5.Root.new('overallProgressChart');
+            root._logo && root._logo.dispose();
+            var chart = root.container.children.push(am5percent.PieChart.new(root, {
+                layout: root.verticalLayout
+            }));
+
+            // Данные для диаграммы общего прогресса
+            var data = [
+                {
+                    category: "Completed",
+                    value: overallProgress,
+                    color: overallProgress < 25 ? am5.color(0xff0000) : // Красный для прогресса меньше 25%
+                           overallProgress < 50 ? am5.color(0xffff00) : // Желтый для прогресса меньше 50%
+                           overallProgress < 75 ? am5.color(0x0000ff) : // Синий для прогресса меньше 75%
+                           am5.color(0x00ff00) // Зеленый для прогресса 75% и выше
+                },
+                {
+                    category: "Remaining",
+                    value: 100 - overallProgress,
+                    color: am5.color(0xcccccc) // Серый цвет для оставшейся части
+                }
+            ];
+
+            // Создаем серию данных для круговой диаграммы общего прогресса
+            var series = chart.series.push(am5percent.PieSeries.new(root, {
+                name: "Процент выполнения",
+                valueField: "value",
+                categoryField: "category",
+                fillField: "color"
+            }));
+
+            series.data.setAll(data);
+
+            // Настройка подсказок и скрытие меток
+            series.slices.template.setAll({
+                tooltipText: "{category}: {value}%",
+                labelsEnabled: false // Отключаем метки на диаграмме
+            });
+
+            series.labels.template.set("forceHidden", true); // Принудительно скрываем метки
+            series.ticks.template.set("visible", false); // Отключаем линии
+
+            // Запуск анимации для общего прогресса
+            series.appear(1000, 100);
+            chart.appear(1000, 100);
+
+            if (tasks.length > 0) {
+                // Создаем контейнер для всех диаграмм в ряд
+                var chartsContainer = document.getElementById('chartsContainer');
+                chartsContainer.className = 'row g-2 justify-content-start'; // Добавляем Bootstrap класс для расположения в ряд с отступами
+
+                tasks.forEach(function(task, index) {
+                    // Добавляем заголовок с названием задачи
+                    var title = document.createElement('h5');
+                    title.textContent = task.title;
+                    title.className = 'text-center mb-3 fw-bold';
+                    var titleContainer = document.createElement('div');
+                    titleContainer.className = 'col-md-4 shadow p-3 mb-4 bg-white rounded'; // Bootstrap класс для оформления карточки
+                    titleContainer.style.border = '1px solid #e0e0e0';
+                    titleContainer.style.padding = '15px';
+                    titleContainer.style.borderRadius = '10px';
+                    titleContainer.style.marginBottom = '5px';
+                    titleContainer.style.marginRight = '5px';
+
+                    titleContainer.appendChild(title);
+
+                    // Создаем новый контейнер для диаграммы
+                    var container = document.createElement('div');
+                    container.id = 'chartdiv-' + index;
+                    container.style.width = '100%';
+                    container.style.height = '300px';
+                    titleContainer.appendChild(container);
+                    chartsContainer.appendChild(titleContainer);
+                    var chartContainerId = 'chartdiv-' + index;
+
+                    // Создаем корень для диаграммы
+                    var root = am5.Root.new(chartContainerId);
+                    // Убираем логотип amCharts корректным образом
+                    root._logo && root._logo.dispose();
+                    var chart = root.container.children.push(am5percent.PieChart.new(root, {
+                        layout: root.verticalLayout
+                    }));
+
+                    // Данные для диаграммы
+                    var startDate = new Date(task.start_date);
+                    var endDate = new Date(task.deadline);
+                    var currentDate = new Date();
+                    var monthsCount = (endDate.getFullYear() - startDate.getFullYear()) * 12 + (endDate.getMonth() - startDate.getMonth());
+                    var allocatedPercent = 100 / monthsCount; // Каждая часть диаграммы занимает равную долю
+
+                    var data = [];
+
+                    for (var i = 0; i < monthsCount; i++) {
+                        var monthDate = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
+                        var monthName = monthDate.toLocaleString('ru-RU', { month: 'long' });
+
+                        // Определяем выполнение только до текущего месяца
+                        var completion = (monthDate <= currentDate) ? parseFloat(task.progress) : 0;
+
+                        var color;
+
+                        // Определяем цвет сегмента на основе процента выполнения
+                        if (completion === 0) {
+                            color = am5.color(0xcccccc); // Серый цвет для невыполненных месяцев
+                        } else if (completion < allocatedPercent - 10) {
+                            color = am5.color(0xff0000); // Красный цвет для выполнения меньше 10%
+                        } else if (completion < allocatedPercent - 5) {
+                            color = am5.color(0xffff00); // Желтый цвет для выполнения меньше 5%
+                        } else if (completion >= allocatedPercent) {
+                            color = am5.color(0x00ff00); // Зеленый цвет для выполнения по плану или выше
+                        }
+
+                        data.push({
+                            month: monthName.charAt(0).toUpperCase() + monthName.slice(1),
+                            completion: allocatedPercent,  // Сегменты разделены поровну по месяцам
+                            actualCompletion: completion, // Фактическое выполнение для отображения
+                            color: color
+                        });
+                    }
+
+                    // Создаем серию данных для круговой диаграммы
+                    var series = chart.series.push(am5percent.PieSeries.new(root, {
+                        name: "Процент выполнения",
+                        valueField: "completion", // Значение, определяющее размер сегмента (равные части)
+                        categoryField: "month",
+                        fillField: "color"
+                    }));
+
+                    series.data.setAll(data);
+
+                    // Настройка подсказок и скрытие меток
+                    series.slices.template.setAll({
+                        tooltipText: "{category}: {actualCompletion}% выполнено",
+                        labelsEnabled: false // Отключаем метки на диаграмме
+                    });
+
+                    series.labels.template.set("forceHidden", true); // Принудительно скрываем метки
+                    series.ticks.template.set("visible", false); // Отключаем линии
+
+                    // Запуск анимации
+                    series.appear(1000, 100);
+                    chart.appear(1000, 100);
+                });
+            }
+        });
+    });
+</script>
+
+
+
+
+
+
+  </body>
+</html>
